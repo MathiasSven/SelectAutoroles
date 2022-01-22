@@ -288,6 +288,7 @@ async def panel(ctx: discord.ApplicationContext, title: str, description: str):
 async def add(
     ctx: discord.ApplicationContext, emoji: str, role: discord.Role, description: str, private: bool
 ):
+    emoji = emoji.strip()
     guild = ctx.interaction.guild
     if role not in bot.configs[guild.id].autoroles:  # Checks if role is already in autoroles
         if not is_defualt_emoji(emoji):  # Emoji checking
