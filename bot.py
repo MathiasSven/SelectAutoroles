@@ -13,7 +13,6 @@ load_dotenv()
 TOKEN: Final[str] = cast(str, os.getenv("TOKEN"))
 GUILD_ID: Final[int] = int(cast(str, os.getenv("GUILD_ID")))
 
-manage_roles = commands.has_permissions(manage_roles=True)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -62,8 +61,18 @@ class Bot(discord.Bot):
     async def on_guild_join(self, guild: discord.Guild):
         self.configs[guild.id] = ServerConfigs(autoroles=dict())
 
+    async def on_application_command_error(self, context: discord.ApplicationContext, exception):
+        if isinstance(exception, commands.errors.MissingPermissions):
+            await context.respond(exception.args[0], ephemeral=True)
+        else:
+            super().on_application_command_error(context, exception)
+
 
 bot = Bot()
+
+
+def manage_roles_check(ctx: discord.ApplicationContext) -> bool:
+    return cast(bool, commands.has_guild_permissions(manage_roles=True).predicate(ctx))
 
 
 class RoleSelect(discord.ui.Select):
@@ -137,7 +146,7 @@ class SelectRoleButtonView(discord.ui.View):
     name="panel",
     description="Create an autorole embed",
     guild_ids=[GUILD_ID],
-    checks=[manage_roles],
+    checks=[manage_roles_check],
     options=[
         discord.Option(
             discord.enums.SlashCommandOptionType.string,
@@ -191,7 +200,7 @@ async def panel(ctx: discord.ApplicationContext, title: str, description: str, c
     name="add",
     description="Add roles to autoroles",
     guild_ids=[GUILD_ID],
-    checks=[manage_roles],
+    checks=[manage_roles_check],
     options=[
         discord.Option(
             discord.enums.SlashCommandOptionType.string,
@@ -247,7 +256,7 @@ async def add(ctx: discord.ApplicationContext, emoji: str, role: discord.Role):
     name="remove",
     description="Remove role from autoroles",
     guild_ids=[GUILD_ID],
-    checks=[manage_roles],
+    checks=[manage_roles_check],
     options=[
         discord.Option(
             discord.enums.SlashCommandOptionType.role,
