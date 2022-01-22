@@ -86,7 +86,7 @@ class RoleSelect(discord.ui.Select):
             placeholder="Select your roles",
             min_values=0,
             max_values=len(options),
-            options=options,
+            options=sorted(options, key=lambda x: x.label),  # type: ignore[no-any-return]
         )
 
     async def callback(self, interaction: discord.Interaction):
