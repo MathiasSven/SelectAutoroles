@@ -12,12 +12,7 @@ import discord
 from discord.ext import commands  # type: ignore[attr-defined]
 from dotenv import load_dotenv
 
-load_dotenv()
-
-TOKEN: Final[str] = cast(str, os.getenv("TOKEN"))
-GUILD_ID: Final[int] = int(cast(str, os.getenv("GUILD_ID")))
-
-
+# Logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -27,10 +22,32 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 
 logger.addHandler(stream_handler)
+# --------
 
+# Constants
+load_dotenv()
+
+TOKEN: Final[str] = cast(str, os.getenv("TOKEN"))
+GUILD_ID: Final[int] = int(cast(str, os.getenv("GUILD_ID")))
 
 with open("emoji_map.json") as f:
     DEFAULT_EMOJI: Final[dict[str, str]] = json.load(f)
+
+INTENTS: Final = discord.Intents(
+    guilds=True,
+    emojis_and_stickers=True,
+    members=False,
+    bans=False,
+    integrations=False,
+    webhooks=False,
+    invites=False,
+    voice_states=False,
+    presences=False,
+    messages=False,
+    reactions=False,
+    typing=False,
+)
+# ----------
 
 
 def manage_roles_check(ctx: discord.ApplicationContext) -> bool:
@@ -96,7 +113,7 @@ class Bot(discord.Bot):
     configs: dict[int, ServerConfig] = {}
 
     def __init__(self):
-        super().__init__()
+        super().__init__(intents=INTENTS)
         self.persistent_views_added = False
 
     async def on_guild_join(self, guild: discord.Guild):
@@ -436,11 +453,9 @@ async def on_ready():
     try:
         with open("db.json", "r") as db:
             db_partial: dict[str, Any] = json.load(db)
-
-            bot.configs = {
-                int(guild_id): ServerConfig.from_dict(bot.get_guild(int(guild_id)), **server_config)
-                for guild_id, server_config in db_partial.items()
-            }
+            
+            for guild_id, server_config in db_partial.items():
+                bot.configs[int(guild_id)] = ServerConfig.from_dict(bot.get_guild(int(guild_id)), **server_config)
 
             logger.info("Loaded database into memory")
 
