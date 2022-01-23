@@ -227,16 +227,12 @@ async def panel(ctx: discord.ApplicationContext, title: str, description: str):
     if pub_auto := set(filter(lambda r: not r.private, autoroles)):
         embed.add_field(
             name="Open Roles:",
-            value="\u200b\n"
-            + "\n".join(f"{ar.emoji} {ar.role.mention}" for ar in pub_auto)
-            + "\n\u200b",
+            value="\n".join(f"{ar.emoji} {ar.role.mention}" for ar in pub_auto),
         )
     if priv_auto := set(filter(lambda r: r.private, autoroles)):
         embed.add_field(
             name="Member/Invite Roles:",
-            value="\u200b\n"
-            + "\n".join(f"{ar.emoji} {ar.role.mention}" for ar in priv_auto)
-            + "\n\u200b",
+            value="\n".join(f"{ar.emoji} {ar.role.mention}" for ar in priv_auto),
             inline=True,
         )
 
