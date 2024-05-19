@@ -139,7 +139,7 @@ class RoleSelect(discord.ui.Select):
         options = [
             discord.SelectOption(
                 label=autorole.role.name,
-                value=autorole.role.id,
+                value=str(autorole.role.id),
                 description=autorole.description,
                 emoji=autorole.emoji,
                 default=bool(user.get_role(autorole.role.id)),
@@ -154,10 +154,11 @@ class RoleSelect(discord.ui.Select):
             options=sorted(options, key=lambda x: x.label),  # type: ignore[no-any-return]
         )
 
+
     async def callback(self, interaction: discord.Interaction):
         user = interaction.user
         user_roles = set(r.id for r in user.roles)
-        available_roles = set(opt.value for opt in self.options)
+        available_roles = set(int(opt.value) for opt in self.options)
         selected_roles = set(int(v) for v in self.values)
 
         to_remove_ids = user_roles & available_roles - selected_roles
@@ -168,6 +169,7 @@ class RoleSelect(discord.ui.Select):
 
         await user.add_roles(*to_add, reason="Autorole")
         await user.remove_roles(*to_remove, reason="Autorole")
+        await interaction.respond()
 
 
 @bot.slash_command(name="roles", description="Autorole selection menu", guild_ids=[GUILD_ID])
