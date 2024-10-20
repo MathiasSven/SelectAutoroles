@@ -5,10 +5,11 @@ import json
 import logging
 import os
 import re
-from typing import Any, Final, cast
+from typing import Any, Final, cast, no_type_check
 
 import attrs
 import discord
+import discord.utils as dutils  # Bug with PyLance
 from discord.ext import commands  # type: ignore[attr-defined]
 from dotenv import load_dotenv
 
@@ -69,10 +70,10 @@ class Autorole:
     def from_dict(cls, guild: discord.Guild, **kwargs) -> Autorole | None:
         role = guild.get_role(kwargs.pop("role"))
         if isinstance((e := kwargs.pop("emoji")), int):
-            emoji = discord.utils.get(guild.emojis, id=e)
+            emoji = dutils.get(guild.emojis, id=e)
         else:
             emoji = e
-        return cls(role, emoji, **kwargs) if role else None
+        return cls(role, emoji, **kwargs) if role else None # type: ignore
 
     def __str__(self) -> str:
         return (
@@ -125,7 +126,7 @@ class Bot(discord.Bot):
         if isinstance(exception, commands.errors.MissingPermissions):
             await context.respond(exception.args[0], ephemeral=True)
         else:
-            await super().on_application_command_error(context, exception)
+            await super().on_application_command_error(context, exception)  # type: ignore
 
 
 bot = Bot()
@@ -135,6 +136,9 @@ class RoleSelect(discord.ui.Select):
     def __init__(self, interaction: discord.Interaction):
         guild_id = interaction.guild_id
         user = interaction.user
+
+        assert guild_id is not None
+        assert isinstance(user, discord.Member)
 
         options = [
             discord.SelectOption(
@@ -156,22 +160,27 @@ class RoleSelect(discord.ui.Select):
 
 
     async def callback(self, interaction: discord.Interaction):
+        guild = interaction.guild
         user = interaction.user
+
+        assert guild is not None
+        assert isinstance(user, discord.Member)
+
         user_roles = set(r.id for r in user.roles)
         available_roles = set(int(opt.value) for opt in self.options)
-        selected_roles = set(int(v) for v in self.values)
+        selected_roles = set(int(v) for v in self.values)  # type: ignore
 
         to_remove_ids = user_roles & available_roles - selected_roles
         to_add_ids = selected_roles - user_roles
 
-        to_remove = {interaction.guild.get_role(r_id) for r_id in to_remove_ids}
-        to_add = {interaction.guild.get_role(r_id) for r_id in to_add_ids}
+        to_remove = {guild.get_role(r_id) for r_id in to_remove_ids}
+        to_add = {guild.get_role(r_id) for r_id in to_add_ids}
 
-        await user.add_roles(*to_add, reason="Autorole")
-        await user.remove_roles(*to_remove, reason="Autorole")
+        await user.add_roles(*to_add, reason="Autorole")  # type: ignore
+        await user.remove_roles(*to_remove, reason="Autorole")  # type: ignore
         await interaction.respond()
 
-
+@no_type_check
 @bot.slash_command(name="roles", description="Autorole selection menu", guild_ids=[GUILD_ID])
 async def roles(ctx: discord.ApplicationContext):
     if bot.configs[ctx.interaction.guild_id].autoroles:
@@ -193,6 +202,8 @@ class SelectRoleButtonView(discord.ui.View):
         label="Select Role(s)",
         custom_id="SelectRoleButtonView:callback",
     )
+
+    @no_type_check
     async def callback(self, button: discord.ui.Button, interaction: discord.Interaction):
         if bot.configs[interaction.guild_id].autoroles:
             if bot.configs[interaction.guild_id].available_autoroles(interaction.user):
@@ -232,7 +243,10 @@ admin = bot.create_group("admin", "Commands related to mathematics.", [GUILD_ID]
     ],
 )
 async def panel(ctx: discord.ApplicationContext, title: str, description: str):
-    autoroles = bot.configs[ctx.interaction.guild_id].autoroles
+    guild_id = ctx.interaction.guild_id
+    assert guild_id is not None
+
+    autoroles = bot.configs[guild_id].autoroles
     if not autoroles:
         await ctx.interaction.response.send_message(
             "There are no autoroles registered", ephemeral=True
@@ -240,7 +254,7 @@ async def panel(ctx: discord.ApplicationContext, title: str, description: str):
         return
     embed = discord.Embed(
         title=title,
-        colour=bot.configs[ctx.interaction.guild_id].color or discord.Embed.Empty,
+        colour=bot.configs[guild_id].color or discord.Embed.Empty,  # type: ignore
         description=description,
     )
     if pub_auto := set(filter(lambda r: not r.private, autoroles)):
@@ -255,8 +269,8 @@ async def panel(ctx: discord.ApplicationContext, title: str, description: str):
             inline=True,
         )
 
-    if guild_icon := ctx.interaction.guild.icon:
-        embed.set_footer(icon_url=guild_icon.url, text=ctx.interaction.guild.name)
+    if guild_icon := ctx.interaction.guild.icon:  # type: ignore
+        embed.set_footer(icon_url=guild_icon.url, text=ctx.interaction.guild.name)  # type: ignore
 
     await ctx.send(embed=embed, view=SelectRoleButtonView())
     await ctx.respond(
@@ -305,10 +319,12 @@ async def add(
 ):
     emoji = emoji.strip()
     guild = ctx.interaction.guild
+    assert guild is not None
+
     if role not in bot.configs[guild.id].autoroles:  # Checks if role is already in autoroles
         if not is_defualt_emoji(emoji):  # Emoji checking
             try:
-                concrete_emoji = await commands.EmojiConverter().convert(ctx, emoji)
+                concrete_emoji = await commands.EmojiConverter().convert(ctx, emoji)  # type: ignore[reportArgumentType]
             except commands.EmojiNotFound:
                 await ctx.respond("Invalid emoji", ephemeral=True)
                 return
@@ -370,6 +386,7 @@ async def add(
     ],
 )
 async def remove(ctx: discord.ApplicationContext, role: discord.Role):
+    assert ctx.interaction.guild_id is not None
     autoroles = bot.configs[ctx.interaction.guild_id].autoroles
     try:
         autoroles.remove(next(filter(lambda r: r.role == role, autoroles)))
@@ -398,6 +415,7 @@ async def remove(ctx: discord.ApplicationContext, role: discord.Role):
     ],
 )
 async def set_config(ctx: discord.ApplicationContext, member_role: discord.Role, color: str):
+    assert ctx.interaction.guild_id is not None
     server_config = bot.configs[ctx.interaction.guild_id]
     response = []
 
@@ -431,6 +449,7 @@ async def set_config(ctx: discord.ApplicationContext, member_role: discord.Role,
     name="view", description="View options set for this server", checks=[manage_roles_check]
 )
 async def view_config(ctx: discord.ApplicationContext):
+    assert ctx.interaction.guild_id is not None
     server_config = bot.configs[ctx.interaction.guild_id]
     await ctx.respond(
         f"**member_role:** {server_config.member_role.mention}\n"
@@ -442,7 +461,7 @@ async def view_config(ctx: discord.ApplicationContext):
 
 @bot.event
 async def on_ready():
-    logger.info((t := f"Logged in as {bot.user} (ID: {bot.user.id})"))
+    logger.info((t := f"Logged in as {bot.user} (ID: {bot.user.id})"))  # type: ignore[reportOptionalMemberAccess]
     logger.info(len(t) * "-")
 
     if not bot.persistent_views_added:
@@ -455,9 +474,9 @@ async def on_ready():
     try:
         with open("db.json", "r") as db:
             db_partial: dict[str, Any] = json.load(db)
-            
+
             for guild_id, server_config in db_partial.items():
-                bot.configs[int(guild_id)] = ServerConfig.from_dict(bot.get_guild(int(guild_id)), **server_config)
+                bot.configs[int(guild_id)] = ServerConfig.from_dict(bot.get_guild(int(guild_id)), **server_config) # type: ignore
 
             logger.info("Loaded database into memory")
 
