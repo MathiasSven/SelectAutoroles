@@ -178,7 +178,7 @@ class RoleSelect(discord.ui.Select):
 
         await user.add_roles(*to_add, reason="Autorole")  # type: ignore
         await user.remove_roles(*to_remove, reason="Autorole")  # type: ignore
-        await interaction.respond()
+        await interaction.respond("Successfully modified roles", ephemeral=True)
 
 @no_type_check
 @bot.slash_command(name="roles", description="Autorole selection menu", guild_ids=[GUILD_ID])
